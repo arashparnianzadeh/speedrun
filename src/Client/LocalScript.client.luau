@@ -86,9 +86,26 @@ timerEvent.OnClientEvent:Connect(function(action, value, isBest)
 	end
 end)
 
+local function frameToCFrame(f)
+	return CFrame.new(f[1], f[2], f[3]) * CFrame.Angles(0, f[4], 0)
+end
+
 runService.RenderStepped:Connect(function()
 	if running then
 		local elapsed = workspace:GetServerTimeNow() - startedAt
+
+		if ghost and ghostframes then
+			local frameNumber = elapsed / ghostinterval
+			local i = math.floor(frameNumber) + 1
+			local alpha = frameNumber - math.floor(frameNumber)
+			local a = ghostframes[i]
+			local b = ghostframes[i + 1] or a
+			if a then
+				ghost:PivotTo(frameToCFrame(a):Lerp(frameToCFrame(b), alpha))
+			else
+				removeGhost()
+			end
+		end
 		timerLabel.Text = formatTime(elapsed)
 	end
 end)
