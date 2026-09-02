@@ -25,6 +25,7 @@ function Run.new(player)
 	self.player = player
 	self:reset()
 	self.lastReset = 0
+	self.best = nil
 	return self
 end
 
@@ -42,8 +43,12 @@ function Run:finish()
 	end
 	if self.stage == lastStage then
 		local finishTime = workspace:GetServerTimeNow() - self.startedAt
+		local isBest = self.best == nil or finishTime < self.best
 		log(self.player.Name, "finished in", finishTime, "seconds")
-		timerEvent:FireClient(self.player, "finish", finishTime)
+		if isBest then
+			self.best = finishTime
+		end
+		timerEvent:FireClient(self.player, "finish", finishTime, isBest, self.best)
 		self:reset()
 	end
 end

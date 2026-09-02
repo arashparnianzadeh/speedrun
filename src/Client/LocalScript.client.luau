@@ -5,6 +5,7 @@ local timerEvent = replicatedStorage:WaitForChild("TimerEvent")
 local timerGui = game.Players.LocalPlayer.PlayerGui:WaitForChild("TimerGui")
 local timerLabel = timerGui:WaitForChild("Timer")
 local resetButton = timerGui:WaitForChild("ResetButton")
+local BestTime = timerGui:WaitForChild("BestTime")
 
 local function formatTime(timeVal)
 	local mins = math.floor(math.fmod(timeVal,3600)/60)
@@ -15,7 +16,7 @@ end
 local running
 local startedAt
 
-timerEvent.OnClientEvent:Connect(function(action, value)
+timerEvent.OnClientEvent:Connect(function(action, value, isBest, bestTime)
 	if action == "start" then
 		running = true
 		startedAt = value
@@ -23,6 +24,9 @@ timerEvent.OnClientEvent:Connect(function(action, value)
 	elseif action == "finish" then
 		running = false
 		timerLabel.Text = formatTime(value)
+		if isBest then
+			BestTime.Text = formatTime(bestTime)
+		end
 		print(action, value)
 	elseif action == "reset" then
 		running = false
