@@ -2,6 +2,10 @@ local Players = game:GetService("Players")
 local checkpoints = workspace:WaitForChild("Checkpoints")
 local Spawn = workspace:WaitForChild("SpawnLocation")
 
+local startTrigger = workspace:WaitForChild("Startline"):WaitForChild("start")
+local finishTrigger = workspace:WaitForChild("Finishline"):WaitForChild("finish")
+local lastStage = 3
+
 local DEBUG = true
 
 local function log(...)
@@ -19,6 +23,25 @@ function Run.new(player)
 	self:reset()
 	return self
 end
+
+function Run:start()
+	if self.startedAt == nil then
+		self.startedAt = workspace:GetServerTimeNow()
+		log(self.player.Name, "started")
+	end
+end
+
+function Run:finish()
+	if self.startedAt == nil then
+		return
+	end
+	if self.stage == lastStage then
+		local finishTime = workspace:GetServerTimeNow() - self.startedAt
+		log(self.player.Name, "finished in", finishTime, "seconds")
+		self:reset()
+	end
+end
+
 
 function Run:reset()
 	self.stage = 0
@@ -61,3 +84,19 @@ for _, part in checkpoints:GetChildren() do
 		run:advance(stage, part)
 	end)
 end
+
+startTrigger.Touched:Connect(function(hit)
+	local run = runFromHit(hit)
+	if not run then
+		return
+	end
+	run:start()
+end)
+
+finishTrigger.Touched:Connect(function(hit)
+	local run = runFromHit(hit)
+	if not run then
+		return
+	end
+	run:finish()
+end)
