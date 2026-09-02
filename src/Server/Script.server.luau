@@ -1,4 +1,5 @@
 local dataStore = game:GetService("DataStoreService"):GetDataStore("PlayerTimes")
+local runService = game:GetService("RunService")
 
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local timerEvent = replicatedStorage:WaitForChild("TimerEvent")
@@ -10,6 +11,7 @@ local Spawn = workspace:WaitForChild("SpawnLocation")
 local startTrigger = workspace:WaitForChild("Startline"):WaitForChild("start")
 local finishTrigger = workspace:WaitForChild("Finishline"):WaitForChild("finish")
 local lastStage = 3
+local SAMPLE_INTERVAL = 0.05
 
 local DEBUG = true
 
@@ -39,6 +41,20 @@ function Run:start()
 	end
 end
 
+function Run:sample(now)
+	if self.player.Character == nil then
+		return
+	end
+	local hrp = self.player.Character:FindFirstChild("HumanoidRootPart")
+	if hrp == nil then
+		return
+	end
+	local cf = hrp.CFrame
+	local _, yaw = cf:ToOrientation()
+	table.insert(self.frames, { cf.X, cf.Y, cf.Z, yaw })
+	self.nextSample = now + SAMPLE_INTERVAL
+end
+
 function Run:finish()
 	if self.startedAt == nil then
 		return
@@ -52,6 +68,7 @@ function Run:finish()
 			self.player:SetAttribute("BestTime", self.best)
 		end
 		timerEvent:FireClient(self.player, "finish", finishTime, isBest)
+		log(self.player.Name, "frames", #self.frames)
 		self:reset()
 	end
 end
@@ -61,6 +78,8 @@ function Run:reset()
 	self.stage = 0
 	self.startedAt = nil
 	self.player.RespawnLocation = Spawn
+	self.frames = {}
+	self.nextSample = 0
 end
 
 function Run:advance(stage, part)
@@ -81,6 +100,15 @@ local function runFromHit(hit)
 	local player = Players:GetPlayerFromCharacter(hit.Parent)
 	return player and runs[player]
 end
+
+runService.Heartbeat:Connect(function()
+	local now = workspace:GetServerTimeNow()
+	for _, run in runs do
+		if run.startedAt and now >= run.nextSample then
+			run:sample(now)
+		end
+	end
+end)
 
 Players.PlayerAdded:Connect(function(player)
 	runs[player] = Run.new(player)
