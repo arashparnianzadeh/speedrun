@@ -66,7 +66,9 @@ function Run:finish()
 		if isBest then
 			self.best = finishTime
 			self.player:SetAttribute("BestTime", self.best)
+			self.bestFrames = self.frames
 		end
+		timerEvent:FireClient(self.player, "ghost", { frames = self.frames, interval = SAMPLE_INTERVAL })
 		timerEvent:FireClient(self.player, "finish", finishTime, isBest)
 		log(self.player.Name, "frames", #self.frames)
 		self:reset()

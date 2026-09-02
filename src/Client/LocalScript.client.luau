@@ -26,21 +26,63 @@ player:GetAttributeChangedSignal("BestTime"):Connect(updateBest)
 
 local running
 local startedAt
+local ghostframes
+local ghostinterval
+local ghost
+
+local function removeGhost()
+	if ghost then
+		ghost:Destroy()
+		ghost = nil
+	end
+end
+
+local function makeGhost()
+	local character = player.Character
+	if not character then
+		return nil
+	end
+	character.Archivable = true
+	local clone = character:Clone()
+	for _, thing in clone:GetDescendants() do
+		if thing:IsA("BasePart") then
+			thing.Anchored = true
+			thing.CanCollide = false
+			thing.Transparency = 0.6
+			thing.Color = Color3.fromRGB(80, 140, 255)
+		elseif thing:IsA("Decal") or thing:IsA("Shirt") or thing:IsA("Pants") or thing:IsA("LuaSourceContainer") then
+			thing:Destroy()
+		end
+	end
+	local humanoid = clone:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid:Destroy()
+	end
+	clone.Name = "Ghost"
+	clone.Parent = workspace
+	return clone
+end
 
 timerEvent.OnClientEvent:Connect(function(action, value, isBest)
 	if action == "start" then
 		running = true
 		startedAt = value
+		if ghostframes then ghost = makeGhost() end
 		print(action, value)
 	elseif action == "finish" then
 		running = false
 		timerLabel.Text = formatTime(value)
+		removeGhost()
 		print(action, value)
 	elseif action == "reset" then
 		running = false
 		startedAt = nil
 		timerLabel.Text = "00:00.00"
+		removeGhost()
 		print(action)
+	elseif action == "ghost" then
+		ghostframes = value.frames
+		ghostinterval = value.interval
 	end
 end)
 
