@@ -1,3 +1,5 @@
+local dataStore = game:GetService("DataStoreService"):GetDataStore("PlayerTimes")
+
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local timerEvent = replicatedStorage:WaitForChild("TimerEvent")
 
@@ -47,8 +49,9 @@ function Run:finish()
 		log(self.player.Name, "finished in", finishTime, "seconds")
 		if isBest then
 			self.best = finishTime
+			self.player:SetAttribute("BestTime", self.best)
 		end
-		timerEvent:FireClient(self.player, "finish", finishTime, isBest, self.best)
+		timerEvent:FireClient(self.player, "finish", finishTime, isBest)
 		self:reset()
 	end
 end
@@ -70,6 +73,9 @@ function Run:advance(stage, part)
 end
 
 local runs = {}
+local function keyFor(player)
+	return "Player_" .. player.UserId
+end
 
 local function runFromHit(hit)
 	local player = Players:GetPlayerFromCharacter(hit.Parent)
@@ -78,9 +84,42 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	runs[player] = Run.new(player)
+	local run = runs[player]
+	local key = keyFor(player)
+	
+	local success, result = pcall(function()
+		return dataStore:GetAsync(key)
+	end)
+	
+	if success then
+		if result then
+			run.best = result.best
+		end
+	else
+		warn("load failed for", player.Name, result)
+		run.loadFailed = true
+	end
+	
+	log(player.Name, "loaded best", run.best)
+	player:SetAttribute("BestTime", run.best)
 end)
 
+local function saveBestTimes(player)
+	local run = runs[player]
+	if not run or run.loadFailed then 
+		return 
+	end
+	local key = keyFor(player)
+	local success, result = pcall(function()
+		dataStore:SetAsync(key, { best = run.best })
+	end)
+	if not success then 
+		warn("save failed for", player.Name, result) 
+	end
+end
+
 Players.PlayerRemoving:Connect(function(player)
+	saveBestTimes(player)
 	runs[player] = nil
 end)
 
@@ -131,5 +170,11 @@ timerEvent.OnServerEvent:Connect(function(player, action)
 			return
 		end
 		character:PivotTo(Spawn.CFrame + Vector3.new(0, 3, 0))
+	end
+end)
+
+game:BindToClose(function()
+	for _, player in Players:GetPlayers() do
+		saveBestTimes(player)
 	end
 end)
