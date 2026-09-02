@@ -24,6 +24,7 @@ function Run.new(player)
 	local self = setmetatable({}, Run)
 	self.player = player
 	self:reset()
+	self.lastReset = 0
 	return self
 end
 
@@ -104,4 +105,26 @@ finishTrigger.Touched:Connect(function(hit)
 		return
 	end
 	run:finish()
+end)
+
+timerEvent.OnServerEvent:Connect(function(player, action)
+	local run = runs[player]
+	if not run then
+		return
+	end
+	
+	if action == "reset" then
+		local now = workspace:GetServerTimeNow()
+		if now - run.lastReset < 1 then
+			return
+		end
+		run.lastReset = now
+		run:reset()
+		timerEvent:FireClient(player, "reset")
+		local character = player.Character
+		if not character then
+			return
+		end
+		character:PivotTo(Spawn.CFrame + Vector3.new(0, 3, 0))
+	end
 end)

@@ -4,6 +4,7 @@ local timerEvent = replicatedStorage:WaitForChild("TimerEvent")
 
 local timerGui = game.Players.LocalPlayer.PlayerGui:WaitForChild("TimerGui")
 local timerLabel = timerGui:WaitForChild("Timer")
+local resetButton = timerGui:WaitForChild("ResetButton")
 
 local function formatTime(timeVal)
 	local mins = math.floor(math.fmod(timeVal,3600)/60)
@@ -23,6 +24,11 @@ timerEvent.OnClientEvent:Connect(function(action, value)
 		running = false
 		timerLabel.Text = formatTime(value)
 		print(action, value)
+	elseif action == "reset" then
+		running = false
+		startedAt = nil
+		timerLabel.Text = "00:00.00"
+		print(action)
 	end
 end)
 
@@ -31,4 +37,8 @@ runService.RenderStepped:Connect(function()
 		local elapsed = workspace:GetServerTimeNow() - startedAt
 		timerLabel.Text = formatTime(elapsed)
 	end
+end)
+
+resetButton.Activated:Connect(function()
+	timerEvent:FireServer("reset")
 end)
