@@ -29,11 +29,15 @@ local startedAt
 local ghostframes
 local ghostinterval
 local ghost
+local ghostTracks
+local ghostCurrent
 
 local function removeGhost()
 	if ghost then
 		ghost:Destroy()
 		ghost = nil
+		ghostTracks = nil
+		ghostCurrent = nil
 	end
 end
 
@@ -46,7 +50,7 @@ local function makeGhost()
 	local clone = character:Clone()
 	for _, thing in clone:GetDescendants() do
 		if thing:IsA("BasePart") then
-			thing.Anchored = true
+			thing.Anchored = thing.Name == "HumanoidRootPart"
 			thing.CanCollide = false
 			thing.Transparency = 0.6
 			thing.Color = Color3.fromRGB(80, 140, 255)
@@ -58,8 +62,18 @@ local function makeGhost()
 	if humanoid then
 		humanoid:Destroy()
 	end
+	local controller = Instance.new("AnimationController")
+	controller.Parent = clone
+	local animator = Instance.new("Animator")
+	animator.Parent = controller
 	clone.Name = "Ghost"
 	clone.Parent = workspace
+	local animate = character:FindFirstChild("Animate")
+	ghostTracks = {}
+	for _, name in { "idle", "run", "jump", "fall" } do
+		local animation = animate[name]:FindFirstChildOfClass("Animation")
+		ghostTracks[name] = animator:LoadAnimation(animation)
+	end
 	return clone
 end
 
@@ -90,6 +104,17 @@ local function frameToCFrame(f)
 	return CFrame.new(f[1], f[2], f[3]) * CFrame.Angles(0, f[4], 0)
 end
 
+local function setGhostAnimation(name)
+	if name == ghostCurrent then
+		return
+	end
+	if ghostCurrent then
+		ghostTracks[ghostCurrent]:Stop()
+	end
+	ghostTracks[name]:Play()
+	ghostCurrent = name
+end
+
 runService.RenderStepped:Connect(function()
 	if running then
 		local elapsed = workspace:GetServerTimeNow() - startedAt
@@ -102,6 +127,18 @@ runService.RenderStepped:Connect(function()
 			local b = ghostframes[i + 1] or a
 			if a then
 				ghost:PivotTo(frameToCFrame(a):Lerp(frameToCFrame(b), alpha))
+				local dx, dy, dz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
+				local horizontal = math.sqrt(dx * dx + dz * dz) / ghostinterval
+				local vertical = dy / ghostinterval
+				if vertical > 3 then
+					setGhostAnimation("jump")
+				elseif vertical < -3 then
+					setGhostAnimation("fall")
+				elseif horizontal > 1 then
+					setGhostAnimation("run")
+				else
+					setGhostAnimation("idle")
+				end
 			else
 				removeGhost()
 			end
