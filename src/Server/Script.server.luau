@@ -1,3 +1,6 @@
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local timerEvent = replicatedStorage:WaitForChild("TimerEvent")
+
 local Players = game:GetService("Players")
 local checkpoints = workspace:WaitForChild("Checkpoints")
 local Spawn = workspace:WaitForChild("SpawnLocation")
@@ -28,6 +31,7 @@ function Run:start()
 	if self.startedAt == nil then
 		self.startedAt = workspace:GetServerTimeNow()
 		log(self.player.Name, "started")
+		timerEvent:FireClient(self.player, "start", self.startedAt)
 	end
 end
 
@@ -38,6 +42,7 @@ function Run:finish()
 	if self.stage == lastStage then
 		local finishTime = workspace:GetServerTimeNow() - self.startedAt
 		log(self.player.Name, "finished in", finishTime, "seconds")
+		timerEvent:FireClient(self.player, "finish", finishTime)
 		self:reset()
 	end
 end
