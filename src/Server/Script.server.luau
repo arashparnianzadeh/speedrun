@@ -1,3 +1,5 @@
+-- Discord: Rashimaal | Roblox: Rashimaal
+
 local dataStore = game:GetService("DataStoreService"):GetDataStore("PlayerTimes")
 local runService = game:GetService("RunService")
 
@@ -10,21 +12,24 @@ local Spawn = workspace:WaitForChild("SpawnLocation")
 
 local startTrigger = workspace:WaitForChild("Startline"):WaitForChild("start")
 local finishTrigger = workspace:WaitForChild("Finishline"):WaitForChild("finish")
-local lastStage = 3
+local lastStage = 0
 local SAMPLE_INTERVAL = 0.05
 
-local DEBUG = true
-
-local function log(...)
-	if DEBUG then
-		print("[Checkpoints]", ...)
+for _, part in checkpoints:GetChildren() do
+	local stage = tonumber(part.Name)
+	if stage and stage > lastStage then
+		lastStage = stage
 	end
+end
+
+local function round2(n)
+	return math.round(n * 100) / 100
 end
 
 local Run = {}
 Run.__index = Run
 
-function Run.new(player)
+function Run.new(player) -- creates a table with the new player's data
 	local self = setmetatable({}, Run)
 	self.player = player
 	self:reset()
@@ -33,15 +38,14 @@ function Run.new(player)
 	return self
 end
 
-function Run:start()
+function Run:start() -- starts the run
 	if self.startedAt == nil then
 		self.startedAt = workspace:GetServerTimeNow()
-		log(self.player.Name, "started")
 		timerEvent:FireClient(self.player, "start", self.startedAt)
 	end
 end
 
-function Run:sample(now)
+function Run:sample(now) -- saves the player's position for the ghost
 	if self.player.Character == nil then
 		return
 	end
@@ -51,32 +55,36 @@ function Run:sample(now)
 	end
 	local cf = hrp.CFrame
 	local _, yaw = cf:ToOrientation()
-	table.insert(self.frames, { cf.X, cf.Y, cf.Z, yaw })
+	table.insert(self.frames, { round2(cf.X), round2(cf.Y), round2(cf.Z), round2(yaw) })
 	self.nextSample = now + SAMPLE_INTERVAL
 end
 
-function Run:finish()
+function Run:sendGhost()
+	if self.bestFrames then
+		timerEvent:FireClient(self.player, "ghost", { frames = self.bestFrames, interval = SAMPLE_INTERVAL })
+	end
+end
+
+function Run:finish() -- ends the run
 	if self.startedAt == nil then
 		return
 	end
 	if self.stage == lastStage then
 		local finishTime = workspace:GetServerTimeNow() - self.startedAt
 		local isBest = self.best == nil or finishTime < self.best
-		log(self.player.Name, "finished in", finishTime, "seconds")
 		if isBest then
 			self.best = finishTime
 			self.player:SetAttribute("BestTime", self.best)
 			self.bestFrames = self.frames
-			timerEvent:FireClient(self.player, "ghost", { frames = self.frames, interval = SAMPLE_INTERVAL })
+			self:sendGhost()
 		end
-		timerEvent:FireClient(self.player, "finish", finishTime, isBest)
-		log(self.player.Name, "frames", #self.frames)
+		timerEvent:FireClient(self.player, "finish", finishTime, isBest) -- fire client to send the finish time to the player
 		self:reset()
 	end
 end
 
 
-function Run:reset()
+function Run:reset() -- resets the run
 	self.stage = 0
 	self.startedAt = nil
 	self.player.RespawnLocation = Spawn
@@ -84,26 +92,25 @@ function Run:reset()
 	self.nextSample = 0
 end
 
-function Run:advance(stage, part)
-	if self.stage ~= stage - 1 then
+function Run:advance(stage, part) -- advances the run to the next stage
+	if self.stage ~= stage - 1 then -- checks the stage
 		return
 	end
 	self.stage = stage
 	self.player.RespawnLocation = part
-	log(self.player.Name, "reached stage", stage)
 end
 
 local runs = {}
-local function keyFor(player)
+local function keyFor(player) -- key for datastore
 	return "Player_" .. player.UserId
 end
 
-local function runFromHit(hit)
+local function runFromHit(hit) -- gets the run from the part hit
 	local player = Players:GetPlayerFromCharacter(hit.Parent)
 	return player and runs[player]
 end
 
-runService.Heartbeat:Connect(function()
+runService.Heartbeat:Connect(function() -- updates the players' positions
 	local now = workspace:GetServerTimeNow()
 	for _, run in runs do
 		if run.startedAt and now >= run.nextSample then
@@ -112,7 +119,7 @@ runService.Heartbeat:Connect(function()
 	end
 end)
 
-Players.PlayerAdded:Connect(function(player)
+Players.PlayerAdded:Connect(function(player) -- gets the players data when they join
 	runs[player] = Run.new(player)
 	local run = runs[player]
 	local key = keyFor(player)
@@ -124,24 +131,25 @@ Players.PlayerAdded:Connect(function(player)
 	if success then
 		if result then
 			run.best = result.best
+			run.bestFrames = result.frames
 		end
 	else
 		warn("load failed for", player.Name, result)
 		run.loadFailed = true
 	end
 	
-	log(player.Name, "loaded best", run.best)
 	player:SetAttribute("BestTime", run.best)
+	run:sendGhost()
 end)
 
-local function saveBestTimes(player)
+local function saveBestTimes(player) -- saves the players data when they leave
 	local run = runs[player]
 	if not run or run.loadFailed then 
 		return 
 	end
 	local key = keyFor(player)
 	local success, result = pcall(function()
-		dataStore:SetAsync(key, { best = run.best })
+		dataStore:SetAsync(key, { best = run.best, frames = run.bestFrames })
 	end)
 	if not success then 
 		warn("save failed for", player.Name, result) 
@@ -153,7 +161,7 @@ Players.PlayerRemoving:Connect(function(player)
 	runs[player] = nil
 end)
 
-for _, part in checkpoints:GetChildren() do
+for _, part in checkpoints:GetChildren() do -- sets up the checkpoints to make sure each one gets touched
 	local stage = tonumber(part.Name)
 
 	part.Touched:Connect(function(hit)
@@ -181,13 +189,13 @@ finishTrigger.Touched:Connect(function(hit)
 	run:finish()
 end)
 
-timerEvent.OnServerEvent:Connect(function(player, action)
+timerEvent.OnServerEvent:Connect(function(player, action) -- handles the timer events server side
 	local run = runs[player]
 	if not run then
 		return
 	end
 	
-	if action == "reset" then
+	if action == "reset" then -- sends the player back to spawn if they click the reset button
 		local now = workspace:GetServerTimeNow()
 		if now - run.lastReset < 1 then
 			return
@@ -200,10 +208,12 @@ timerEvent.OnServerEvent:Connect(function(player, action)
 			return
 		end
 		character:PivotTo(Spawn.CFrame + Vector3.new(0, 3, 0))
+	elseif action == "ready" then
+		run:sendGhost()
 	end
 end)
 
-game:BindToClose(function()
+game:BindToClose(function() -- saves the players data when the server closes
 	for _, player in Players:GetPlayers() do
 		saveBestTimes(player)
 	end

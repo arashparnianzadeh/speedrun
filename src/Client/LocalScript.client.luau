@@ -32,7 +32,7 @@ local ghost
 local ghostTracks
 local ghostCurrent
 
-local function removeGhost()
+local function removeGhost() -- removes the ghost character
 	if ghost then
 		ghost:Destroy()
 		ghost = nil
@@ -41,14 +41,14 @@ local function removeGhost()
 	end
 end
 
-local function makeGhost()
+local function makeGhost() -- makes the ghost character
 	local character = player.Character
 	if not character then
 		return nil
 	end
 	character.Archivable = true
 	local clone = character:Clone()
-	for _, thing in clone:GetDescendants() do
+	for _, thing in clone:GetDescendants() do -- make the ghost look like a ghost
 		if thing:IsA("BasePart") then
 			thing.Anchored = thing.Name == "HumanoidRootPart"
 			thing.CanCollide = false
@@ -70,14 +70,14 @@ local function makeGhost()
 	clone.Parent = workspace
 	local animate = character:FindFirstChild("Animate")
 	ghostTracks = {}
-	for _, name in { "idle", "run", "jump", "fall" } do
+	for _, name in { "idle", "run", "jump", "fall" } do -- load the animations for the ghost
 		local animation = animate[name]:FindFirstChildOfClass("Animation")
 		ghostTracks[name] = animator:LoadAnimation(animation)
 	end
 	return clone
 end
 
-timerEvent.OnClientEvent:Connect(function(action, value, isBest)
+timerEvent.OnClientEvent:Connect(function(action, value, isBest) -- handles the timer events client side
 	if action == "start" then
 		running = true
 		startedAt = value
@@ -104,7 +104,7 @@ local function frameToCFrame(f)
 	return CFrame.new(f[1], f[2], f[3]) * CFrame.Angles(0, f[4], 0)
 end
 
-local function setGhostAnimation(name)
+local function setGhostAnimation(name) -- plays the given animation on the ghost character
 	if name == ghostCurrent then
 		return
 	end
@@ -115,7 +115,7 @@ local function setGhostAnimation(name)
 	ghostCurrent = name
 end
 
-runService.RenderStepped:Connect(function()
+runService.RenderStepped:Connect(function() -- updates the ghost character
 	if running then
 		local elapsed = workspace:GetServerTimeNow() - startedAt
 
@@ -125,7 +125,7 @@ runService.RenderStepped:Connect(function()
 			local alpha = frameNumber - math.floor(frameNumber)
 			local a = ghostframes[i]
 			local b = ghostframes[i + 1] or a
-			if a then
+			if a then -- applies animations depending on the current frame
 				ghost:PivotTo(frameToCFrame(a):Lerp(frameToCFrame(b), alpha))
 				local dx, dy, dz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
 				local horizontal = math.sqrt(dx * dx + dz * dz) / ghostinterval
@@ -147,6 +147,7 @@ runService.RenderStepped:Connect(function()
 	end
 end)
 
-resetButton.Activated:Connect(function()
+resetButton.Activated:Connect(function() -- fires the reset event when the reset button is clicked
 	timerEvent:FireServer("reset")
 end)
+timerEvent:FireServer("ready")
