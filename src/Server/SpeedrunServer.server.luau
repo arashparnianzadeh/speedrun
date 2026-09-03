@@ -6,9 +6,9 @@ local runService = game:GetService("RunService")
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local timerEvent = replicatedStorage:WaitForChild("TimerEvent")
 
-local Players = game:GetService("Players")
+local players = game:GetService("Players")
 local checkpoints = workspace:WaitForChild("Checkpoints")
-local Spawn = workspace:WaitForChild("SpawnLocation")
+local spawnLocation = workspace:WaitForChild("SpawnLocation")
 
 local startTrigger = workspace:WaitForChild("Startline"):WaitForChild("start")
 local finishTrigger = workspace:WaitForChild("Finishline"):WaitForChild("finish")
@@ -24,6 +24,12 @@ end
 
 local function round2(n)
 	return math.round(n * 100) / 100
+end
+
+local function formatTime(timeVal)
+	local mins = math.floor(math.fmod(timeVal,3600)/60)
+	local secs = math.fmod(timeVal,60)
+	return string.format("%02d:%05.2f", mins, secs)
 end
 
 local Run = {}
@@ -74,7 +80,7 @@ function Run:finish() -- ends the run
 		local isBest = self.best == nil or finishTime < self.best
 		if isBest then
 			self.best = finishTime
-			self.player:SetAttribute("BestTime", self.best)
+			self:showBest()
 			self.bestFrames = self.frames
 			self:sendGhost()
 		end
@@ -87,9 +93,18 @@ end
 function Run:reset() -- resets the run
 	self.stage = 0
 	self.startedAt = nil
-	self.player.RespawnLocation = Spawn
+	self.player.RespawnLocation = spawnLocation
 	self.frames = {}
 	self.nextSample = 0
+end
+
+function Run:showBest()
+	self.player:SetAttribute("BestTime", self.best)
+	if self.best then
+		self.bestValue.Value = formatTime(self.best)
+	else
+		self.bestValue.Value = ""
+	end
 end
 
 function Run:advance(stage, part) -- advances the run to the next stage
@@ -106,7 +121,7 @@ local function keyFor(player) -- key for datastore
 end
 
 local function runFromHit(hit) -- gets the run from the part hit
-	local player = Players:GetPlayerFromCharacter(hit.Parent)
+	local player = players:GetPlayerFromCharacter(hit.Parent)
 	return player and runs[player]
 end
 
@@ -119,9 +134,16 @@ runService.Heartbeat:Connect(function() -- updates the players' positions
 	end
 end)
 
-Players.PlayerAdded:Connect(function(player) -- gets the players data when they join
+players.PlayerAdded:Connect(function(player) -- gets the players data when they join
 	runs[player] = Run.new(player)
 	local run = runs[player]
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+	local bestValue = Instance.new("StringValue")
+	bestValue.Name = "Best"
+	bestValue.Parent = leaderstats
+	run.bestValue = bestValue
 	local key = keyFor(player)
 	
 	local success, result = pcall(function()
@@ -138,7 +160,7 @@ Players.PlayerAdded:Connect(function(player) -- gets the players data when they 
 		run.loadFailed = true
 	end
 	
-	player:SetAttribute("BestTime", run.best)
+	run:showBest()
 	run:sendGhost()
 end)
 
@@ -156,7 +178,7 @@ local function saveBestTimes(player) -- saves the players data when they leave
 	end
 end
 
-Players.PlayerRemoving:Connect(function(player)
+players.PlayerRemoving:Connect(function(player)
 	saveBestTimes(player)
 	runs[player] = nil
 end)
@@ -207,14 +229,14 @@ timerEvent.OnServerEvent:Connect(function(player, action) -- handles the timer e
 		if not character then
 			return
 		end
-		character:PivotTo(Spawn.CFrame + Vector3.new(0, 3, 0))
+		character:PivotTo(spawnLocation.CFrame + Vector3.new(0, 3, 0))
 	elseif action == "ready" then
 		run:sendGhost()
 	end
 end)
 
 game:BindToClose(function() -- saves the players data when the server closes
-	for _, player in Players:GetPlayers() do
+	for _, player in players:GetPlayers() do
 		saveBestTimes(player)
 	end
 end)

@@ -82,18 +82,15 @@ timerEvent.OnClientEvent:Connect(function(action, value, isBest) -- handles the 
 		running = true
 		startedAt = value
 		if ghostframes then ghost = makeGhost() end
-		print(action, value)
 	elseif action == "finish" then
 		running = false
 		timerLabel.Text = formatTime(value)
 		removeGhost()
-		print(action, value)
 	elseif action == "reset" then
 		running = false
 		startedAt = nil
 		timerLabel.Text = "00:00.00"
 		removeGhost()
-		print(action)
 	elseif action == "ghost" then
 		ghostframes = value.frames
 		ghostinterval = value.interval
